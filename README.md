@@ -1,133 +1,101 @@
-# Mesa de Partes — Voto Electrónico Seguro
+# Mesa de Partes Electronica - RENIEC
 
-[![Stack](https://img.shields.io/badge/stack-React%20%7C%20FastAPI-brightgreen)](#)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](#)
-[![Node](https://img.shields.io/badge/Node.js-18%2B-green)](#)
+Sistema de Mesa de Partes Electronica para la automatizacion del registro, derivacion y seguimiento de solicitudes en el Registro Nacional de Identificacion y Estado Civil (RENIEC). Permite a los ciudadanos ingresar tramites y a los administradores derivar y gestionar sus estados.
 
-Sistema de **Mesa de Partes Electrónica** para la automatización del registro y derivación de solicitudes de voto. Reduce tiempos de espera y previene fraudes mediante cifrado SHA-256 y llaves dinámicas generadas por algoritmos genéticos.
+## Organizacion del Repositorio
 
-> Proyecto del curso **Desarrollo de Software (CC3S2-A)** — Grupo 2.
-
----
-
-## ¿Qué hace el sistema?
-
-El sistema cubre dos grandes flujos:
-
-| Funcionalidad | Descripción |
-|---|---|
-| **Emisión de voto seguro** | El ciudadano ingresa su DNI e ID de candidato. El backend genera un hash SHA-256 del voto junto con una llave evolutiva producida por un algoritmo genético. Se devuelve un comprobante con hash, llave y timestamp. |
-| **Derivación de solicitudes** | Un administrador puede derivar solicitudes a la dependencia correspondiente (Registro Civil, Identificación, GRIAS, Imagenología, etc.) según el tipo de trámite. |
-| **Auditoría** | Endpoint de auditoría que devuelve todos los votos cifrados almacenados para verificación interna. |
-| **Consulta de estado** | Permite consultar el estado de una solicitud derivada por su ID. |
-| **Health check** | Endpoint `/health` para monitoreo de disponibilidad del servicio. |
-
-> **Nota sobre persistencia:** Actualmente el repositorio de solicitudes es **en memoria** (se reinicia al apagar el servidor). No hay base de datos relacional conectada aún — es el siguiente paso planificado en el roadmap.
-
----
-
-## Organización del Repositorio
-
-```
+```text
 VotingSystem/
 ├── backend/                    # API REST con FastAPI (Python)
-│   ├── app.py                  # Punto de entrada (uvicorn)
-│   ├── requirements.txt        # Dependencias Python
+│   ├── app.py                  # Punto de entrada de la aplicacion
+│   ├── requirements.txt        # Dependencias del backend
 │   └── src/
-│       ├── config.py           # Configuración centralizada (env vars)
-│       ├── main.py             # App factory de FastAPI + CORS + routers
-│       ├── modelos/            # Entidades de dominio (Pydantic)
-│       ├── servicios/          # Lógica de negocio (cifrado, GA, derivación)
-│       ├── repositorios/       # Capa de persistencia (en memoria / reemplazable)
-│       ├── rutas/              # Endpoints: votos, admin, solicitudes
-│       ├── excepciones/        # Errores de dominio y handlers HTTP
-│       ├── utilidades/         # SHA-256, algoritmo genético de llaves
-│       └── logging_config.py   # Logging estructurado
+│       ├── config.py           # Configuracion del entorno
+│       ├── main.py             # Instanciacion de FastAPI y ruteo
+│       ├── modelos/            # Entidades y esquemas de datos (Pydantic)
+│       │   ├── factories.py    # Factory Method para creacion de Solicitud
+│       │   └── solicitud.py    # Definicion de la clase Solicitud
+│       ├── servicios/          # Logica de negocio y patrones de comportamiento
+│       │   ├── estrategias.py  # Patron Strategy (calculo de plazos)
+│       │   ├── observadores.py # Patron Observer (auditoria y logs)
+│       │   └── solicitud_service.py # Coordinador del ciclo de vida
+│       ├── repositorios/       # Capa de persistencia (Singleton)
+│       │   └── solicitud_repo.py    # Repositorio en memoria thread-safe
+│       ├── rutas/              # Endpoints HTTP expuestos
+│       │   ├── solicitudes.py       # Operaciones del ciudadano
+│       │   └── admin_solicitudes.py # Operaciones del administrador
+│       ├── excepciones/        # Manejo de errores
+│       ├── utilidades/         # Utilidades secundarias
+│       └── logging_config.py   # Registro de logs del sistema
 │
-├── frontend/                   # SPA con React + TypeScript + Vite
+├── frontend/                   # Interfaz de Usuario con React + Vite
 │   ├── index.html
 │   └── src/
-│       ├── App.tsx             # Layout principal (split panel institucional)
-│       ├── components/
-│       │   ├── VotingForm.tsx       # Formulario de voto (DNI + candidato)
-│       │   ├── VotingReceipt.tsx    # Comprobante del voto cifrado
-│       │   └── AdminDerivacionPanel.tsx  # Panel de administración
-│       ├── hooks/
-│       │   └── useVoting.ts    # Hook asíncrono: fetch + estado de carga
-│       ├── api/                # Funciones de llamada al backend
-│       └── types/              # Tipos TypeScript compartidos
+│       ├── App.tsx             # Componente raiz y layout institucional
+│       ├── components/         # Componentes del Portal Ciudadano y Administrador
+│       │   ├── SolicitudForm.tsx       # Registro de solicitudes
+│       │   ├── SolicitudLookup.tsx     # Busqueda y consulta de tramites
+│       │   ├── SolicitudReceipt.tsx    # Recibo de confirmacion
+│       │   └── AdminDerivacionPanel.tsx # Panel de control del administrador
+│       ├── api/                # Cliente HTTP para llamadas al backend
+│       └── types/              # Tipos compartidos en TypeScript
 │
 └── README.md
 ```
 
----
+## Patrones de Diseño Implementados
 
-## Tecnologías
+El sistema utiliza cuatro patrones de diseño clasicos del catalogo GoF para estructurar la logica de negocio y facilitar su extension:
 
-### Backend
-| Tecnología | Uso |
-|---|---|
-| **Python 3.10+** | Lenguaje principal del servidor |
-| **FastAPI** | Framework web asíncrono, genera Swagger UI automáticamente |
-| **Uvicorn** | Servidor ASGI de alta performance |
-| **Pydantic v2** | Validación y serialización de datos |
-| **SHA-256** (stdlib) | Cifrado del voto para garantizar anonimato |
-| **Algoritmos Genéticos** | Generación de llaves evolutivas dinámicas |
+### 1. Singleton (Creacion)
+* **Clase:** RepositorioSolicitudEnMemoria en `backend/src/repositorios/solicitud_repo.py`
+* **Descripcion:** Garantiza la existencia de una unica instancia del repositorio de datos en memoria para toda la aplicacion. Utiliza un mecanismo de exclusion mutua (Lock) con doble comprobacion para asegurar un comportamiento thread-safe.
 
-### Frontend
-| Tecnología | Uso |
-|---|---|
-| **React 18 + TypeScript** | UI reactiva con tipado estricto |
-| **Vite** | Bundler y servidor de desarrollo ultrarrápido |
-| **Chakra UI v3** | Sistema de componentes con paleta institucional RENIEC |
+### 2. Factory Method (Creacion)
+* **Clase:** SolicitudFactory en `backend/src/modelos/factories.py`
+* **Descripcion:** Centraliza y aisla la logica de construccion de las solicitudes. A partir de los parametros de entrada del ciudadano, inicializa los estados iniciales por defecto y selecciona la estrategia adecuada para asignar los plazos de respuesta.
 
-### Infraestructura / Flujo
-| Herramienta | Uso |
-|---|---|
-| **Git + GitHub** | Control de versiones, ramas `main` / `develop` / `feature/*` |
-| **Jira (Smart Commits)** | Trazabilidad de tickets desde los mensajes de commit |
+### 3. Strategy (Comportamiento)
+* **Clases:** CalculoFechaLimiteStrategy, DiasHabilesCalculoStrategy y DiasCalendariosCalculoStrategy en `backend/src/servicios/estrategias.py`
+* **Descripcion:** Define una interfaz comun para el calculo de plazos maximos de atencion.
+  * **DiasHabilesCalculoStrategy:** Suma 30 dias habiles (excluyendo sabados y domingos) para tramites con prioridad Normal.
+  * **DiasCalendariosCalculoStrategy:** Suma 15 dias calendarios corridos para tramites de prioridad Urgente.
 
----
+### 4. Observer (Comportamiento)
+* **Clases:** SolicitudSubject, SolicitudObserver, LogObserver, AuditObserver y NotificationObserver en `backend/src/servicios/observadores.py`
+* **Descripcion:** Permite reaccionar a los eventos importantes del ciclo de vida de una solicitud (registro, derivacion y cambio de estado) sin acoplar la logica principal. Los observadores registran de manera independiente en los logs del sistema, generan un historico de auditoria y simulan el envio de notificaciones externas al ciudadano.
 
-## Cómo ejecutar el proyecto
+## Tecnologias Principales
 
-Abrir **dos terminales** en la raíz de `VotingSystem/`.
+* **Backend:** Python 3.10+, FastAPI (servicios asincronos), Pydantic v2 (validacion), Pytest (pruebas).
+* **Frontend:** React 18, TypeScript, Vite, Chakra UI v3 (diseño institucional adaptado a RENIEC).
 
-### 1. Backend
+## Guia de Ejecucion Rapida
 
+### Ejecutar el Backend
 ```bash
 cd backend
-
-# Crear y activar entorno virtual (solo la primera vez)
 python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Linux / macOS
-
+# Activar entorno virtual:
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn src.main:app --reload --port 8000
 ```
+* **Swagger UI:** `http://localhost:8000/docs`
 
-- API en: `http://localhost:8000`
-- Swagger UI: `http://localhost:8000/docs`
-
-### 2. Frontend
-
+### Ejecutar el Frontend
 ```bash
 cd frontend
-npm install        # solo la primera vez
+npm install
 npm run dev
 ```
+* **Portal Local:** `http://localhost:5173`
 
-- Portal web: `http://localhost:5173`
+## Integrantes - Grupo 2
 
----
-
-## Integrantes — Grupo 2
-
-| Nombre |
-|---|
-| Alvaro Jesus Taipe Cotrina |
-| Andrew Owim Inga Rojas |
-| César Omar López Arteaga |
-| Jose Alfredo Palomino |
-| Leonardo Chacón |
+* Alvaro Jesus Taipe Cotrina
+* Andrew Owim Inga Rojas
+* Cesar Omar Lopez Arteaga
+* Jose Alfredo Palomino
+* Leonardo Chacon
