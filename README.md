@@ -92,10 +92,7 @@ npm run dev
 ```
 * **Portal Local:** `http://localhost:5173`
 
-## Integrantes - Grupo 2
+## Integrante
 
 * Alvaro Jesus Taipe Cotrina
-* Andrew Owim Inga Rojas
-* Cesar Omar Lopez Arteaga
-* Jose Alfredo Palomino
-* Leonardo Chacon
+
