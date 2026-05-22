@@ -4,20 +4,24 @@ from src.modelos.solicitud import (
     Dependencia,
     DerivacionInput,
     EstadoSolicitud,
+    Prioridad,
+    TipoTramite,
     Solicitud,
     SolicitudDerivada,
     SolicitudInput,
+    EstadoUpdateInput,
 )
-from src.modelos.voto import AuditoriaVotos, VotoCifrado, VotoInput
+from src.modelos.factories import SolicitudFactory
 
 __all__ = [
-    "AuditoriaVotos",
     "Dependencia",
     "DerivacionInput",
     "EstadoSolicitud",
+    "Prioridad",
+    "TipoTramite",
     "Solicitud",
     "SolicitudDerivada",
     "SolicitudInput",
-    "VotoCifrado",
-    "VotoInput",
+    "EstadoUpdateInput",
+    "SolicitudFactory",
 ]

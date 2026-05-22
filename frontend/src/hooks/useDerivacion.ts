@@ -1,19 +1,19 @@
 /**
- * Custom Hook que encapsula el flujo asincrono de la HU04.
- *
- * Lista solicitudes entrantes y ejecuta la derivacion contra el backend,
- * exponiendo loading/error/data al componente sin acoplarlo a ``fetch``
- * (Single Responsibility Principle).
+ * Custom Hook que encapsula el flujo asincrono para el panel administrativo.
  */
 
-import { useCallback, useEffect, useState } from "react";
-
+import { useCallback, useState } from "react";
 import {
   derivarSolicitud,
   listarSolicitudesEntrantes,
+  actualizarEstadoSolicitud,
 } from "@/api/derivacionApi";
-import { ApiError } from "@/types/voting";
-import type { DerivacionInput, Solicitud } from "@/types/derivacion";
+import { ApiError } from "@/types/api";
+import type {
+  DerivacionInput,
+  EstadoUpdateInput,
+  Solicitud,
+} from "@/types/derivacion";
 
 export interface UseDerivacionState {
   readonly solicitudes: readonly Solicitud[];
@@ -25,10 +25,16 @@ export interface UseDerivacionState {
 }
 
 export interface UseDerivacionResult extends UseDerivacionState {
-  readonly recargar: () => Promise<void>;
+  readonly recargar: (adminToken: string) => Promise<void>;
   readonly derivar: (
-    idSolicitud: number,
+    idSolicitud: string,
     payload: DerivacionInput,
+    adminToken: string,
+  ) => Promise<Solicitud | null>;
+  readonly actualizarEstado: (
+    idSolicitud: string,
+    payload: EstadoUpdateInput,
+    adminToken: string,
   ) => Promise<Solicitud | null>;
   readonly limpiarUltima: () => void;
 }
@@ -50,10 +56,11 @@ function aApiError(err: unknown): ApiError {
 export function useDerivacion(): UseDerivacionResult {
   const [estado, setEstado] = useState<UseDerivacionState>(ESTADO_INICIAL);
 
-  const recargar = useCallback(async (): Promise<void> => {
+  const recargar = useCallback(async (adminToken: string): Promise<void> => {
+    if (!adminToken) return;
     setEstado((prev) => ({ ...prev, cargandoListado: true, errorListado: null }));
     try {
-      const solicitudes = await listarSolicitudesEntrantes();
+      const solicitudes = await listarSolicitudesEntrantes(adminToken);
       setEstado((prev) => ({
         ...prev,
         solicitudes,
@@ -70,8 +77,9 @@ export function useDerivacion(): UseDerivacionResult {
 
   const derivar = useCallback(
     async (
-      idSolicitud: number,
+      idSolicitud: string,
       payload: DerivacionInput,
+      adminToken: string,
     ): Promise<Solicitud | null> => {
       setEstado((prev) => ({
         ...prev,
@@ -80,14 +88,45 @@ export function useDerivacion(): UseDerivacionResult {
         ultimaDerivada: null,
       }));
       try {
-        const derivada = await derivarSolicitud(idSolicitud, payload);
+        const derivada = await derivarSolicitud(idSolicitud, payload, adminToken);
         setEstado((prev) => ({
           ...prev,
           enviandoDerivacion: false,
           ultimaDerivada: derivada,
-          solicitudes: prev.solicitudes.filter((s) => s.id !== derivada.id),
+          solicitudes: prev.solicitudes.map((s) => (s.id === derivada.id ? derivada : s)),
         }));
         return derivada;
+      } catch (err) {
+        setEstado((prev) => ({
+          ...prev,
+          enviandoDerivacion: false,
+          errorDerivacion: aApiError(err),
+        }));
+        return null;
+      }
+    },
+    [],
+  );
+
+  const actualizarEstado = useCallback(
+    async (
+      idSolicitud: string,
+      payload: EstadoUpdateInput,
+      adminToken: string,
+    ): Promise<Solicitud | null> => {
+      setEstado((prev) => ({
+        ...prev,
+        enviandoDerivacion: true,
+        errorDerivacion: null,
+      }));
+      try {
+        const actualizada = await actualizarEstadoSolicitud(idSolicitud, payload, adminToken);
+        setEstado((prev) => ({
+          ...prev,
+          enviandoDerivacion: false,
+          solicitudes: prev.solicitudes.map((s) => (s.id === actualizada.id ? actualizada : s)),
+        }));
+        return actualizada;
       } catch (err) {
         setEstado((prev) => ({
           ...prev,
@@ -104,9 +143,5 @@ export function useDerivacion(): UseDerivacionResult {
     setEstado((prev) => ({ ...prev, ultimaDerivada: null }));
   }, []);
 
-  useEffect(() => {
-    void recargar();
-  }, [recargar]);
-
-  return { ...estado, recargar, derivar, limpiarUltima };
+  return { ...estado, recargar, derivar, actualizarEstado, limpiarUltima };
 }

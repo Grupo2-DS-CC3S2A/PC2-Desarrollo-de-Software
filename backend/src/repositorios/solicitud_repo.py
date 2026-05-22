@@ -49,6 +49,20 @@ class SolicitudRepository(ABC):
         """
 
     @abstractmethod
+    def actualizar(self, solicitud: Solicitud) -> Solicitud:
+        """Actualiza una solicitud existente en el repositorio.
+
+        Args:
+            solicitud: Entidad de dominio modificada.
+
+        Returns:
+            La entidad de dominio actualizada.
+
+        Raises:
+            SolicitudNoEncontradaError: Si no existe la solicitud.
+        """
+
+    @abstractmethod
     def obtener_por_id(self, solicitud_id: str) -> Solicitud:
         """Recupera una solicitud por su identificador.
 
@@ -81,17 +95,29 @@ class SolicitudRepository(ABC):
 
 
 class RepositorioSolicitudEnMemoria(SolicitudRepository):
-    """Adaptador en memoria thread-safe del repositorio de solicitudes.
+    """Adaptador en memoria thread-safe del repositorio de solicitudes (GoF Singleton).
 
-    Apto para desarrollo y pruebas; en produccion se reemplaza por una
-    implementacion respaldada por una base de datos relacional. La
-    estructura interna usa un diccionario indexado por ``id`` para garantizar
-    busqueda O(1) y evitar duplicados.
+    Apto para desarrollo y pruebas; implementado como un Singleton clasico
+    con Lock de doble comprobacion para seguridad en hilos.
     """
 
+    _instance = None
+    _singleton_lock = Lock()
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            with cls._singleton_lock:
+                if not cls._instance:
+                    cls._instance = super(RepositorioSolicitudEnMemoria, cls).__new__(cls)
+                    cls._instance._inicializado = False
+        return cls._instance
+
     def __init__(self) -> None:
+        if getattr(self, "_inicializado", False):
+            return
         self._solicitudes: dict[str, Solicitud] = {}
         self._lock: Lock = Lock()
+        self._inicializado = True
 
     def guardar(self, solicitud: Solicitud) -> Solicitud:
         with self._lock:
@@ -101,9 +127,24 @@ class RepositorioSolicitudEnMemoria(SolicitudRepository):
                 )
             self._solicitudes[solicitud.id] = solicitud
         logger.info(
-            "Solicitud persistida | id=%s | dependencia=%s | estado=%s",
+            "Solicitud persistida | id=%s | prioridad=%s | estado=%s",
             solicitud.id,
-            solicitud.dependencia_asignada.value,
+            solicitud.prioridad.value,
+            solicitud.estado.value,
+        )
+        return solicitud
+
+    def actualizar(self, solicitud: Solicitud) -> Solicitud:
+        with self._lock:
+            if solicitud.id not in self._solicitudes:
+                raise SolicitudNoEncontradaError(
+                    f"No existe solicitud con id '{solicitud.id}' para actualizar."
+                )
+            self._solicitudes[solicitud.id] = solicitud
+        logger.info(
+            "Solicitud actualizada | id=%s | dependencia=%s | estado=%s",
+            solicitud.id,
+            solicitud.dependencia_asignada.value if solicitud.dependencia_asignada else "None",
             solicitud.estado.value,
         )
         return solicitud
@@ -152,5 +193,6 @@ class RepositorioSolicitudEnMemoria(SolicitudRepository):
 
 @lru_cache(maxsize=1)
 def get_solicitud_repository() -> SolicitudRepository:
-    """Provee una instancia singleton del repositorio (DI para FastAPI)."""
+    """Provee una instancia del repositorio singleton."""
     return RepositorioSolicitudEnMemoria()
+

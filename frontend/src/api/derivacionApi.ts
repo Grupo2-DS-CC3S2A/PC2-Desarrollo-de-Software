@@ -1,12 +1,17 @@
 /**
- * Cliente HTTP del modulo Mesa de Partes (HU04).
+ * Cliente HTTP unificado del modulo Mesa de Partes (HU04).
  *
  * Aisla a las capas superiores del transporte ``fetch`` y unifica el
  * tratamiento de errores via {@link ApiError}.
  */
 
-import { ApiError, type ApiErrorBody } from "@/types/voting";
-import type { DerivacionInput, Solicitud } from "@/types/derivacion";
+import { ApiError, type ApiErrorBody } from "@/types/api";
+import type {
+  DerivacionInput,
+  EstadoUpdateInput,
+  Solicitud,
+  SolicitudInput,
+} from "@/types/derivacion";
 
 const DEFAULT_BASE_URL = "http://localhost:8000";
 
@@ -20,7 +25,7 @@ async function parseError(response: Response): Promise<ApiError> {
   try {
     const body = (await response.json()) as ApiErrorBody;
     if (body?.detail) detail = body.detail;
-    tipo = body?.tipo;
+    if (body?.tipo) tipo = body.tipo;
   } catch {
     // Cuerpo no JSON; conservamos detalle por defecto.
   }
@@ -41,17 +46,55 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function listarSolicitudesEntrantes(): Promise<readonly Solicitud[]> {
-  return request<readonly Solicitud[]>("/api/admin/solicitudes");
+// --- Endpoints de Ciudadano ---
+
+export function registrarSolicitud(payload: SolicitudInput): Promise<Solicitud> {
+  return request<Solicitud>("/api/solicitudes", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function obtenerSolicitud(solicitudId: string): Promise<Solicitud> {
+  return request<Solicitud>(`/api/solicitudes/${solicitudId}`);
+}
+
+export function listarSolicitudesUsuario(usuarioId: string): Promise<readonly Solicitud[]> {
+  return request<readonly Solicitud[]>(`/api/solicitudes/usuario/${usuarioId}`);
+}
+
+// --- Endpoints de Administrador ---
+
+export function listarSolicitudesEntrantes(adminToken: string): Promise<readonly Solicitud[]> {
+  return request<readonly Solicitud[]>("/api/admin/solicitudes", {
+    headers: {
+      "X-Admin-Token": adminToken,
+    },
+  });
 }
 
 export function derivarSolicitud(
-  _idSolicitud: string,
+  idSolicitud: string,
   payload: DerivacionInput,
   adminToken: string,
 ): Promise<Solicitud> {
-  return request<Solicitud>("/api/admin/solicitudes/derivar", {
+  return request<Solicitud>(`/api/admin/solicitudes/${idSolicitud}/derivar`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Token": adminToken,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function actualizarEstadoSolicitud(
+  idSolicitud: string,
+  payload: EstadoUpdateInput,
+  adminToken: string,
+): Promise<Solicitud> {
+  return request<Solicitud>(`/api/admin/solicitudes/${idSolicitud}/estado`, {
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
       "X-Admin-Token": adminToken,

@@ -32,6 +32,21 @@ class EstadoSolicitud(str, Enum):
     RECHAZADA = "Rechazada"
 
 
+class Prioridad(str, Enum):
+    """Nivel de prioridad de la solicitud."""
+
+    NORMAL = "Normal"
+    URGENTE = "Urgente"
+
+
+class TipoTramite(str, Enum):
+    """Tipo de tramite."""
+
+    TRAMITE = "Tramite"
+    RECLAMO = "Reclamo"
+    CONSULTA = "Consulta"
+
+
 class Dependencia(str, Enum):
     """Dependencias internas elegibles como destinatarias."""
 
@@ -55,7 +70,7 @@ def _nuevo_id() -> str:
 
 
 class SolicitudInput(BaseModel):
-    """Payload de entrada para registrar una nueva solicitud (HU04)."""
+    """Payload de entrada para registrar una nueva solicitud por un ciudadano."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -64,7 +79,23 @@ class SolicitudInput(BaseModel):
         Field(
             min_length=USUARIO_ID_MIN_LENGTH,
             max_length=USUARIO_ID_MAX_LENGTH,
-            description="Identificador del usuario autenticado emisor.",
+            description="Identificador (DNI) del ciudadano.",
+        ),
+    ]
+    tipo_tramite: Annotated[
+        TipoTramite,
+        Field(description="Tipo de tramite (Tramite, Reclamo, Consulta)."),
+    ]
+    prioridad: Annotated[
+        Prioridad,
+        Field(description="Prioridad de la solicitud (Normal, Urgente)."),
+    ]
+    asunto: Annotated[
+        str,
+        Field(
+            min_length=5,
+            max_length=200,
+            description="Asunto o titulo de la solicitud.",
         ),
     ]
     detalle_solicitud: Annotated[
@@ -72,19 +103,7 @@ class SolicitudInput(BaseModel):
         Field(
             min_length=DETALLE_MIN_LENGTH,
             max_length=DETALLE_MAX_LENGTH,
-            description="Descripcion textual del asunto de la solicitud.",
-        ),
-    ]
-    dependencia_asignada: Annotated[
-        Dependencia,
-        Field(description="Dependencia destinataria que debe atender el caso."),
-    ]
-    fecha_maxima_respuesta: Annotated[
-        datetime,
-        Field(
-            description=(
-                "Fecha limite (UTC) en la que la dependencia debe responder."
-            ),
+            description="Detalle explicativo de la solicitud.",
         ),
     ]
 
@@ -109,6 +128,9 @@ class Solicitud(BaseModel):
             max_length=USUARIO_ID_MAX_LENGTH,
         ),
     ]
+    tipo_tramite: TipoTramite
+    prioridad: Prioridad
+    asunto: str
     detalle_solicitud: Annotated[
         str,
         Field(
@@ -116,7 +138,7 @@ class Solicitud(BaseModel):
             max_length=DETALLE_MAX_LENGTH,
         ),
     ]
-    dependencia_asignada: Dependencia
+    dependencia_asignada: Dependencia | None = None
     fecha_ingreso: Annotated[
         datetime,
         Field(default_factory=_ahora_utc),
@@ -126,6 +148,7 @@ class Solicitud(BaseModel):
         EstadoSolicitud,
         Field(default=EstadoSolicitud.PENDIENTE),
     ]
+    observaciones: str = ""
 
     @model_validator(mode="after")
     def _validar_ventana_temporal(self) -> "Solicitud":
@@ -141,35 +164,13 @@ OBSERVACIONES_MAX_LENGTH: int = 500
 
 
 class DerivacionInput(BaseModel):
-    """Payload del administrador para derivar una solicitud (HU04).
-
-    El administrador identifica al usuario y el detalle, escoge la
-    dependencia destino y opcionalmente registra observaciones. La
-    ``fecha_maxima_respuesta`` NO se acepta del cliente: la calcula la
-    capa de servicios por norma (30 dias habiles).
-    """
+    """Payload del administrador para derivar una solicitud a otra dependencia."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    usuario_id: Annotated[
-        str,
-        Field(
-            min_length=USUARIO_ID_MIN_LENGTH,
-            max_length=USUARIO_ID_MAX_LENGTH,
-            description="Identificador del usuario emisor (ciudadano).",
-        ),
-    ]
-    detalle_solicitud: Annotated[
-        str,
-        Field(
-            min_length=DETALLE_MIN_LENGTH,
-            max_length=DETALLE_MAX_LENGTH,
-            description="Descripcion textual del asunto de la solicitud.",
-        ),
-    ]
     dependencia_asignada: Annotated[
         Dependencia,
-        Field(description="Dependencia destinataria que debe atender el caso."),
+        Field(description="Nueva dependencia destinataria."),
     ]
     observaciones: Annotated[
         str,
@@ -181,21 +182,39 @@ class DerivacionInput(BaseModel):
     ] = ""
 
 
-class SolicitudDerivada(BaseModel):
-    """Respuesta del endpoint de derivacion (HU04).
+class EstadoUpdateInput(BaseModel):
+    """Payload del administrador para cambiar el estado de una solicitud."""
 
-    Aplana los campos de auditoria que un administrador necesita ver tras
-    una derivacion exitosa: identificador, dependencia destino, fechas
-    calculadas y estado resultante.
-    """
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    estado: Annotated[
+        EstadoSolicitud,
+        Field(description="Nuevo estado de la solicitud."),
+    ]
+    observaciones: Annotated[
+        str,
+        Field(
+            default="",
+            max_length=OBSERVACIONES_MAX_LENGTH,
+            description="Observaciones sobre el cambio de estado.",
+        ),
+    ] = ""
+
+
+class SolicitudDerivada(BaseModel):
+    """Respuesta del endpoint de derivacion (HU04)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str
     usuario_id: str
+    tipo_tramite: TipoTramite
+    prioridad: Prioridad
+    asunto: str
     detalle_solicitud: str
-    dependencia_asignada: Dependencia
+    dependencia_asignada: Dependencia | None
     fecha_ingreso: datetime
     fecha_maxima_respuesta: datetime
     estado: EstadoSolicitud
     observaciones: str = ""
+

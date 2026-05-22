@@ -4,11 +4,8 @@ from src.servicios.solicitud_service import (
     SolicitudService,
     get_solicitud_service,
 )
-from src.servicios.voto_service import VotoService, get_voto_service
 
 __all__ = [
     "SolicitudService",
-    "VotoService",
     "get_solicitud_service",
-    "get_voto_service",
 ]

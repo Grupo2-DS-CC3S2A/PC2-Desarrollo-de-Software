@@ -1,19 +1,6 @@
 /**
- * Tipos del dominio de votacion compartidos por la UI y el cliente HTTP.
- *
- * Coinciden 1:1 con los modelos Pydantic del backend para evitar drift.
+ * Tipos y clases para el cliente HTTP general.
  */
-
-export interface VotoInput {
-  readonly dni_votante: string;
-  readonly id_candidato: number;
-}
-
-export interface VotoCifrado {
-  readonly hash_voto: string;
-  readonly clave_genetica: string;
-  readonly timestamp: number;
-}
 
 export interface ApiErrorBody {
   readonly detail: string;
