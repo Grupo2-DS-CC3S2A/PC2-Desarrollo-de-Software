@@ -45,25 +45,10 @@ VotingSystem/
 
 ## Patrones de Diseño Implementados
 
-El sistema utiliza cuatro patrones de diseño clasicos del catalogo GoF para estructurar la logica de negocio y facilitar su extension:
-
-### 1. Singleton (Creacion)
-* **Clase:** RepositorioSolicitudEnMemoria en `backend/src/repositorios/solicitud_repo.py`
-* **Descripcion:** Garantiza la existencia de una unica instancia del repositorio de datos en memoria para toda la aplicacion. Utiliza un mecanismo de exclusion mutua (Lock) con doble comprobacion para asegurar un comportamiento thread-safe.
-
-### 2. Factory Method (Creacion)
-* **Clase:** SolicitudFactory en `backend/src/modelos/factories.py`
-* **Descripcion:** Centraliza y aisla la logica de construccion de las solicitudes. A partir de los parametros de entrada del ciudadano, inicializa los estados iniciales por defecto y selecciona la estrategia adecuada para asignar los plazos de respuesta.
-
-### 3. Strategy (Comportamiento)
-* **Clases:** CalculoFechaLimiteStrategy, DiasHabilesCalculoStrategy y DiasCalendariosCalculoStrategy en `backend/src/servicios/estrategias.py`
-* **Descripcion:** Define una interfaz comun para el calculo de plazos maximos de atencion.
-  * **DiasHabilesCalculoStrategy:** Suma 30 dias habiles (excluyendo sabados y domingos) para tramites con prioridad Normal.
-  * **DiasCalendariosCalculoStrategy:** Suma 15 dias calendarios corridos para tramites de prioridad Urgente.
-
-### 4. Observer (Comportamiento)
-* **Clases:** SolicitudSubject, SolicitudObserver, LogObserver, AuditObserver y NotificationObserver en `backend/src/servicios/observadores.py`
-* **Descripcion:** Permite reaccionar a los eventos importantes del ciclo de vida de una solicitud (registro, derivacion y cambio de estado) sin acoplar la logica principal. Los observadores registran de manera independiente en los logs del sistema, generan un historico de auditoria y simulan el envio de notificaciones externas al ciudadano.
+* **Singleton:** [solicitud_repo.py](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/repositorios/solicitud_repo.py) ([RepositorioSolicitudEnMemoria](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/repositorios/solicitud_repo.py#L97))
+* **Factory Method:** [factories.py](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/modelos/factories.py) ([SolicitudFactory](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/modelos/factories.py#L21))
+* **Strategy:** [estrategias.py](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/estrategias.py) ([CalculoFechaLimiteStrategy](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/estrategias.py#L13), [DiasHabilesCalculoStrategy](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/estrategias.py#L28), [DiasCalendariosCalculoStrategy](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/estrategias.py#L58))
+* **Observer:** [observadores.py](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/observadores.py) ([SolicitudSubject](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/observadores.py#L33), [SolicitudObserver](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/observadores.py#L20), [LogObserver](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/observadores.py#L66), [AuditObserver](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/observadores.py#L79), [NotificationObserver](file:///C:/Users/elmas/Downloads/2026-1/Desarrollo%20de%20Software%2025-2%20para%202026-1/DS-Project/VotingSystem/backend/src/servicios/observadores.py#L102))
 
 ## Tecnologias Principales
 
